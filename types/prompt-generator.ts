@@ -18,7 +18,7 @@ export type ApiKeySettings = {
 export type ProductInput = {
   productName: string;
   productType: string;
-  appearanceDescription: string;
+  appearanceDescription?: string;
   realFeatures: string;
   outputCount: OutputCount;
   visualStyle: string;

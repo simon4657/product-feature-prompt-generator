@@ -189,8 +189,8 @@ export default function CreatePage() {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!form.productName.trim() || !form.productType.trim() || !form.appearanceDescription.trim() || !form.realFeatures.trim()) {
-      setError("請先完成商品名稱、類型、外觀描述與真實功能清單。");
+    if (!form.productName.trim() || !form.productType.trim() || !form.realFeatures.trim()) {
+      setError("請先完成商品名稱、類型與真實功能清單。");
       return;
     }
     if (form.realFeatures.includes("[待確認]")) {
@@ -236,9 +236,13 @@ export default function CreatePage() {
               <label className="field"><span>商品名稱 <b>必填</b></span><input value={form.productName} onChange={(e) => update("productName", e.target.value)} placeholder="例：AeroShade 運動眼鏡" /></label>
               <label className="field"><span>商品類型 <b>必填</b></span><input value={form.productType} onChange={(e) => update("productType", e.target.value)} placeholder="例：戶外運動眼鏡" /></label>
             </div>
+            <label className={`reference-toggle ${form.hasReferenceImage ? "selected" : ""}`}>
+              <input type="checkbox" checked={form.hasReferenceImage} onChange={(e) => update("hasReferenceImage", e.target.checked)} />
+              <ImagePlus size={22} /><span><b>我有商品參考圖</b><small>最終 Prompt 會加入嚴格維持參考圖外觀的要求</small></span><i>{form.hasReferenceImage && <Check size={14} />}</i>
+            </label>
             <div className="field">
-              <div className="field-title-row"><label htmlFor="appearance-description">商品外觀描述 <b>必填</b></label><button type="button" className="ai-field-button" onClick={() => generateField("appearance")} disabled={generatingField !== null}>{generatingField === "appearance" ? <LoaderCircle className="spin" size={13} /> : <Sparkles size={13} />} AI 生成</button></div>
-              <textarea id="appearance-description" value={form.appearanceDescription} onChange={(e) => update("appearanceDescription", e.target.value)} placeholder="顏色、材質、輪廓、比例、關鍵零件與不可改變的外觀特徵" />
+              <div className="field-title-row"><label htmlFor="appearance-description">商品外觀描述 <small>選填</small></label><button type="button" className="ai-field-button" onClick={() => generateField("appearance")} disabled={generatingField !== null}>{generatingField === "appearance" ? <LoaderCircle className="spin" size={13} /> : <Sparkles size={13} />} AI 生成</button></div>
+              <textarea id="appearance-description" value={form.appearanceDescription || ""} onChange={(e) => update("appearanceDescription", e.target.value)} placeholder="選填：顏色、材質、輪廓、比例、關鍵零件與不可改變的外觀特徵" />
             </div>
             <div className="field featured">
               <div className="field-title-row"><label htmlFor="real-features">真實功能清單 <b>必填</b></label><button type="button" className="ai-field-button" onClick={() => generateField("features")} disabled={generatingField !== null}>{generatingField === "features" ? <LoaderCircle className="spin" size={13} /> : <Sparkles size={13} />} AI 生成</button></div>
@@ -305,10 +309,6 @@ export default function CreatePage() {
               onGenerate={() => generateField("forbidden")}
               onChange={(value) => update("forbiddenClaims", value)}
             />
-            <label className={`reference-toggle ${form.hasReferenceImage ? "selected" : ""}`}>
-              <input type="checkbox" checked={form.hasReferenceImage} onChange={(e) => update("hasReferenceImage", e.target.checked)} />
-              <ImagePlus size={22} /><span><b>我有商品參考圖</b><small>最終 Prompt 會加入嚴格維持參考圖外觀的要求</small></span><i>{form.hasReferenceImage && <Check size={14} />}</i>
-            </label>
             <AiTextField
               id="additional-notes"
               label="補充說明"
