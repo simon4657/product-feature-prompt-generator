@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { safeApiError, validateApiSettings } from "@/lib/api-route-utils";
 import { callLLM } from "@/lib/llm-client";
+import { enforcePlanningLayout } from "@/lib/layout-presets";
 import { parseLLMJson } from "@/lib/parse-llm";
 import { buildPlanningRepairPrompt, buildPlanningUserPrompt, PLANNING_SYSTEM_PROMPT } from "@/lib/prompts";
 import type { ApiKeySettings, PlanningDraft, ProductInput } from "@/types/prompt-generator";
@@ -44,7 +45,11 @@ export async function POST(request: Request) {
     if (!hasRequestedCardCount(planning, body.productInput.outputCount)) {
       throw new Error(`模型未能產生指定的 ${body.productInput.outputCount} 張企劃，請再試一次或更換模型。`);
     }
-    return NextResponse.json({ success: true, planning: normalizeCardIndexes(planning) });
+    const normalized = normalizeCardIndexes(planning);
+    return NextResponse.json({
+      success: true,
+      planning: enforcePlanningLayout(normalized, body.productInput.layoutStyle)
+    });
   } catch (error) {
     return safeApiError(error);
   }

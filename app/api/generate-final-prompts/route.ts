@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { safeApiError, validateApiSettings } from "@/lib/api-route-utils";
 import { callLLM } from "@/lib/llm-client";
+import { buildLayoutRequirement } from "@/lib/layout-presets";
 import { parseLLMJson } from "@/lib/parse-llm";
 import { buildFinalUserPrompt, FINAL_PROMPT_SYSTEM_PROMPT } from "@/lib/prompts";
 import type { ApiKeySettings, AspectRatio, FinalPromptOutput, PlanningDraft, ProductInput } from "@/types/prompt-generator";
@@ -41,12 +42,14 @@ aspectRatio 必須遵循產品資料中的比例設定。Image Prompt 請完整�
     }
     const output: FinalPromptOutput = { prompts: generated.prompts.map((prompt, index) => {
       const card = body.editedPlanningDraft.cards[index];
+      const layoutRequirement = buildLayoutRequirement(body.productInput.layoutStyle);
       const aspectRatio = body.productInput.aspectRatio !== "ai_suggest"
         ? body.productInput.aspectRatio
         : prompt.aspectRatio || "1:1";
       const title = prompt.title || `第 ${card.cardIndex} 張：${card.featureTheme}功能圖`;
-      const copyText = `【${title}】\n\nImage Prompt:\n${prompt.imagePrompt}\n\nNegative Prompt:\n${prompt.negativePrompt}\n\n建議比例：\n${aspectRatio}`;
-      return { ...prompt, cardIndex: card.cardIndex, title, aspectRatio, copyText };
+      const imagePrompt = `MANDATORY LAYOUT / 強制構圖：${layoutRequirement}\n不得替換為其他版型。維持單張完整畫面。\n\n${prompt.imagePrompt}`;
+      const copyText = `【${title}】\n\nImage Prompt:\n${imagePrompt}\n\nNegative Prompt:\n${prompt.negativePrompt}\n\n建議比例：\n${aspectRatio}`;
+      return { ...prompt, imagePrompt, cardIndex: card.cardIndex, title, aspectRatio, copyText };
     }) };
     return NextResponse.json({ success: true, output });
   } catch (error) {
