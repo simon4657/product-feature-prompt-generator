@@ -12,13 +12,15 @@ import { useApiGuard } from "@/lib/use-api-guard";
 import { readApiResponse } from "@/lib/client-api";
 import { STORAGE_KEYS, type FeatureCardDraft, type FinalPromptOutput, type PlanningDraft, type ProductInput } from "@/types/prompt-generator";
 
+type LoadingAction = "all" | "card" | "final" | null;
+
 export default function PlanningPage() {
   const router = useRouter();
   const { settings: apiSettings, ready } = useApiGuard();
   const [input, setInput] = useState<ProductInput | null>(null);
   const [planning, setPlanning] = useState<PlanningDraft | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [loadingAction, setLoadingAction] = useState<LoadingAction>(null);
   const [error, setError] = useState("");
   const requestInFlight = useRef(false);
 
@@ -42,7 +44,7 @@ export default function PlanningPage() {
   async function regenerateAll() {
     if (!apiSettings || requestInFlight.current) return;
     requestInFlight.current = true;
-    setLoading(true);
+    setLoadingAction("all");
     setError("");
     try {
       const response = await fetch("/api/generate-planning", {
@@ -58,14 +60,14 @@ export default function PlanningPage() {
       setError(regenerateError instanceof Error ? regenerateError.message : "重新生成企劃失敗。");
     } finally {
       requestInFlight.current = false;
-      setLoading(false);
+      setLoadingAction(null);
     }
   }
 
   async function regenerateCard() {
     if (!apiSettings || requestInFlight.current) return;
     requestInFlight.current = true;
-    setLoading(true);
+    setLoadingAction("card");
     setError("");
     try {
       const response = await fetch("/api/regenerate-card", {
@@ -87,14 +89,14 @@ export default function PlanningPage() {
       setError(cardError instanceof Error ? cardError.message : "重新生成本張失敗。");
     } finally {
       requestInFlight.current = false;
-      setLoading(false);
+      setLoadingAction(null);
     }
   }
 
   async function generateFinal() {
     if (!apiSettings || requestInFlight.current) return;
     requestInFlight.current = true;
-    setLoading(true);
+    setLoadingAction("final");
     setError("");
     try {
       const response = await fetch("/api/generate-final-prompts", {
@@ -110,9 +112,11 @@ export default function PlanningPage() {
       setError(finalError instanceof Error ? finalError.message : "Prompt 生成失敗。");
     } finally {
       requestInFlight.current = false;
-      setLoading(false);
+      setLoadingAction(null);
     }
   }
+
+  const isBusy = loadingAction !== null;
 
   return (
     <main className="site-shell">
@@ -121,7 +125,17 @@ export default function PlanningPage() {
         <StepNav current={2} />
         <div className="page-intro planning-intro">
           <div><span className="eyebrow">STEP 02 / EDIT THE PLAN</span><h1>讓每張圖，只說一件事。</h1></div>
-          <div className="intro-actions"><button className="button ghost" onClick={regenerateAll} disabled={loading}>{loading ? <LoaderCircle className="spin" size={16} /> : <RotateCcw size={16} />} 重生全部企劃</button><button className="button primary" onClick={generateFinal} disabled={loading}>確認並生成 Prompts <ArrowRight size={16} /></button></div>
+          <div className="intro-actions">
+            <button className="button ghost" onClick={regenerateAll} disabled={isBusy}>
+              {loadingAction === "all" ? <LoaderCircle className="spin" size={16} /> : <RotateCcw size={16} />}
+              {loadingAction === "all" ? "正在重生企劃" : "重生全部企劃"}
+            </button>
+            <button className="button primary" onClick={generateFinal} disabled={isBusy}>
+              {loadingAction === "final" ? <LoaderCircle className="spin" size={16} /> : null}
+              {loadingAction === "final" ? "正在生成 Prompts" : "確認並生成 Prompts"}
+              {loadingAction !== "final" ? <ArrowRight size={16} /> : null}
+            </button>
+          </div>
         </div>
         <div className="planning-layout">
           <aside className="panel planning-sidebar">
@@ -134,7 +148,7 @@ export default function PlanningPage() {
           <section className="panel editor-panel">
             <FeatureCardEditor
               card={activeCard}
-              loading={loading}
+              loading={loadingAction === "card"}
               onChange={(nextCard) => setPlanning({ ...planning, cards: planning.cards.map((card, index) => index === activeIndex ? nextCard : card) })}
               onRegenerate={regenerateCard}
             />
