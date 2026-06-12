@@ -96,6 +96,37 @@ ${JSON.stringify(invalidPlanning, null, 2)}`;
 }
 
 export function buildFinalUserPrompt(input: ProductInput, planning: PlanningDraft) {
+  const layoutPrefix = buildCreativeDirection(input).split("\n")[0];
+  const scene = input.sceneType?.trim() || "乾淨商業攝影棚";
+  const compactPlanning = {
+    globalStyleRules: {
+      visualStyle: planning.globalStyleRules.visualStyle,
+      colorDirection: planning.globalStyleRules.colorDirection,
+      consistencyRules: planning.globalStyleRules.consistencyRules
+    },
+    cards: planning.cards.map((card) => ({
+      cardIndex: card.cardIndex,
+      featureTheme: card.featureTheme,
+      featureMechanism: card.featureMechanism,
+      userBenefit: card.userBenefit,
+      headline: card.headline,
+      subheadline: card.subheadline,
+      bulletPoints: card.bulletPoints,
+      visualSymbols: card.visualSymbols,
+      compositionDescription: card.compositionDescription
+        .replace(layoutPrefix.replace("構圖版型：", ""), "")
+        .replace("構圖只管理元素位置與比例，不得省略指定美術風格或使用場景。", "")
+        .replace("本張細節：", "")
+        .trim(),
+      sceneDescription: card.sceneDescription
+        .replace(`指定使用場景「${scene}」必須可辨識；可依構圖簡化或景深化，但不可消失。`, "")
+        .replace("本張場景細節：", "")
+        .trim(),
+      humanDescription: card.humanDescription,
+      negativePrompt: card.negativePrompt
+    }))
+  };
+
   return `${FINAL_PROMPT_SYSTEM_PROMPT}
 
 產品資訊：
@@ -106,5 +137,5 @@ ${buildCreativeDirection(input)}
 最終 Image Prompt 必須逐字說清楚商品占比、文字區位置、標註方式、留白配置、美術質感與場景環境。不得改用其他版型，也不得省略美術風格或使用場景；presentationType 只能輔助功能表達。
 
 最終確認企劃：
-${JSON.stringify(planning, null, 2)}`;
+${JSON.stringify(compactPlanning, null, 2)}`;
 }

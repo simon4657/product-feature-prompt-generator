@@ -23,15 +23,72 @@ const DEFAULT_BASE_URLS: Record<LLMProvider, string> = {
   kimi: "https://api.moonshot.cn/v1"
 };
 
-function providerError(status: number, provider: LLMProvider) {
+type ProviderErrorDetail = {
+  code: string;
+  message: string;
+  combined: string;
+};
+
+async function readProviderErrorDetail(response: Response): Promise<ProviderErrorDetail> {
+  const text = await response.text();
+  let code = "";
+  let message = "";
+  try {
+    const data = JSON.parse(text) as {
+      error?: { code?: string; type?: string; message?: string };
+      code?: string;
+      message?: string;
+    };
+    code = data.error?.code || data.error?.type || data.code || "";
+    message = data.error?.message || data.message || "";
+  } catch {
+    message = text;
+  }
+  return {
+    code,
+    message,
+    combined: `${code} ${message}`.toLowerCase()
+  };
+}
+
+function isQuotaError(detail: ProviderErrorDetail) {
+  return /insufficient|quota|balance|credit|billing|余额|餘額|额度|額度/.test(detail.combined);
+}
+
+function isContextError(detail: ProviderErrorDetail) {
+  return /context|maximum.*length|too many tokens|上下文|长度|長度/.test(detail.combined);
+}
+
+function providerError(status: number, provider: LLMProvider, detail: ProviderErrorDetail) {
   if (status === 401 || status === 403) return "API Key 無效或權限不足。";
   if (status === 404) return "模型名稱或 API Endpoint 不存在。";
+  if (status === 429 && provider === "kimi" && isQuotaError(detail)) {
+    return "Kimi API 帳戶餘額或額度不足，請至 Moonshot 開放平台確認帳戶餘額。";
+  }
+  if (status === 429 && provider === "kimi") {
+    return "Kimi API 目前超過速率限制，系統已自動重試；請稍候約 30 秒再試。";
+  }
   if (status === 429) return "API 額度不足或請求過於頻繁。";
+  if (status === 400 && provider === "kimi" && isContextError(detail)) {
+    return "Kimi 收到的企劃內容過長，請縮短商品資料或減少單次生成張數。";
+  }
   if (status === 400 && provider === "kimi") return "Kimi 拒絕了請求參數，請確認模型可用後再試。";
   if (status === 400 && provider === "gemini") return "Gemini 拒絕了請求，請確認模型是否已對此 API Key 開放。";
   if (status === 400 && provider === "openai") return "OpenAI 拒絕了請求，請確認模型是否已對此專案開放。";
   if (status >= 500) return "模型服務暫時無法使用，請稍後再試。";
   return `模型服務請求失敗 (${status})。`;
+}
+
+function retryDelayMs(response: Response) {
+  const retryAfter = Number(response.headers.get("retry-after"));
+  if (Number.isFinite(retryAfter) && retryAfter > 0) {
+    return Math.min(retryAfter * 1000, 10000);
+  }
+  return 2500;
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = 60000) {
@@ -94,7 +151,10 @@ async function callOpenAI(request: LLMRequest): Promise<LLMResponse> {
         : undefined
     })
   }, request.timeoutMs);
-  if (!response.ok) throw new Error(providerError(response.status, "openai"));
+  if (!response.ok) {
+    const detail = await readProviderErrorDetail(response);
+    throw new Error(providerError(response.status, "openai", detail));
+  }
   const data = await response.json() as {
     output_text?: string;
     output?: Array<{
@@ -154,7 +214,10 @@ async function callGemini(request: LLMRequest): Promise<LLMResponse> {
       }
     })
   }, request.timeoutMs);
-  if (!response.ok) throw new Error(providerError(response.status, "gemini"));
+  if (!response.ok) {
+    const detail = await readProviderErrorDetail(response);
+    throw new Error(providerError(response.status, "gemini", detail));
+  }
   const data = await response.json() as {
     candidates?: Array<{
       finishReason?: string;
@@ -172,28 +235,42 @@ async function callGemini(request: LLMRequest): Promise<LLMResponse> {
 }
 
 async function callKimi(request: LLMRequest): Promise<LLMResponse> {
-  const response = await fetchWithTimeout(`${DEFAULT_BASE_URLS.kimi}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${request.apiKey}`
-    },
-    body: JSON.stringify({
-      model: request.modelName,
-      messages: [
-        ...(request.systemPrompt ? [{ role: "system", content: request.systemPrompt }] : []),
-        { role: "user", content: request.userPrompt }
-      ],
-      thinking: request.modelName === "kimi-k2.5" ? { type: "disabled" } : undefined,
-      max_tokens: request.maxOutputTokens ?? 6000,
-      response_format: request.responseFormat === "json" ? { type: "json_object" } : undefined
-    })
-  }, request.timeoutMs);
-  if (!response.ok) throw new Error(providerError(response.status, "kimi"));
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content?.trim();
-  if (!content) throw new Error("Kimi 沒有回傳可用內容。");
-  return { content, raw: data };
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const response = await fetchWithTimeout(`${DEFAULT_BASE_URLS.kimi}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${request.apiKey}`
+      },
+      body: JSON.stringify({
+        model: request.modelName,
+        messages: [
+          ...(request.systemPrompt ? [{ role: "system", content: request.systemPrompt }] : []),
+          { role: "user", content: request.userPrompt }
+        ],
+        thinking: request.modelName === "kimi-k2.5" ? { type: "disabled" } : undefined,
+        max_tokens: request.maxOutputTokens ?? 4000,
+        response_format: request.responseFormat === "json" ? { type: "json_object" } : undefined
+      })
+    }, request.timeoutMs);
+    if (response.ok) {
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content?.trim();
+      if (!content) throw new Error("Kimi 沒有回傳可用內容。");
+      return { content, raw: data };
+    }
+
+    const detail = await readProviderErrorDetail(response);
+    const shouldRetry = response.status === 429
+      && !isQuotaError(detail)
+      && attempt === 0;
+    if (shouldRetry) {
+      await wait(retryDelayMs(response));
+      continue;
+    }
+    throw new Error(providerError(response.status, "kimi", detail));
+  }
+  throw new Error("Kimi API 目前超過速率限制，請稍候約 30 秒再試。");
 }
 
 export async function callLLM(request: LLMRequest): Promise<LLMResponse> {

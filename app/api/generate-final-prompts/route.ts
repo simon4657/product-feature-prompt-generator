@@ -34,7 +34,7 @@ aspectRatio 必須遵循產品資料中的比例設定。Image Prompt 請完整�
       temperature: 0.55,
       responseFormat: "json",
       timeoutMs: 180000,
-      maxOutputTokens: 6000
+      maxOutputTokens: 8000
     });
     const generated = parseLLMJson<{ prompts: GeneratedPrompt[] }>(response.content);
     if (!Array.isArray(generated.prompts) || generated.prompts.length !== body.editedPlanningDraft.cards.length) {
