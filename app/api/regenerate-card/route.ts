@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { safeApiError, validateApiSettings } from "@/lib/api-route-utils";
 import { callLLM } from "@/lib/llm-client";
-import { buildLayoutRequirement, enforceCardLayout } from "@/lib/layout-presets";
+import { buildCreativeDirection, enforceCardLayout } from "@/lib/layout-presets";
 import { parseLLMJson } from "@/lib/parse-llm";
 import { REGENERATE_CARD_SYSTEM_PROMPT } from "@/lib/prompts";
 import type { ApiKeySettings, FeatureCardDraft, PlanningDraft, ProductInput } from "@/types/prompt-generator";
@@ -25,8 +25,8 @@ export async function POST(request: Request) {
 產品資料：
 ${JSON.stringify(body.productInput, null, 2)}
 
-強制構圖規格（優先於其他呈現建議）：
-${buildLayoutRequirement(body.productInput.layoutStyle)}
+強制創意方向（三者必須同時呈現）：
+${buildCreativeDirection(body.productInput)}
 
 全組風格：
 ${JSON.stringify(body.currentPlanningDraft.globalStyleRules, null, 2)}
@@ -37,13 +37,13 @@ ${JSON.stringify(body.currentPlanningDraft.cards.filter((card) => card.cardIndex
 原始圖卡：
 ${JSON.stringify(target, null, 2)}
 
-compositionDescription 必須明確執行上述強制構圖規格，不得替換成其他版型。`,
+compositionDescription 必須執行構圖版型，sceneDescription 必須保留指定場景，整張圖必須呈現指定美術風格。三者不得互相取代。`,
       temperature: 0.8,
       responseFormat: "json"
     });
     const regeneratedCard = parseLLMJson<FeatureCardDraft>(response.content);
     regeneratedCard.cardIndex = body.targetCardIndex;
-    const card = enforceCardLayout(regeneratedCard, body.productInput.layoutStyle);
+    const card = enforceCardLayout(regeneratedCard, body.productInput);
     return NextResponse.json({ success: true, card });
   } catch (error) {
     return safeApiError(error);

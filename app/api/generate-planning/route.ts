@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     const normalized = normalizeCardIndexes(planning);
     return NextResponse.json({
       success: true,
-      planning: enforcePlanningLayout(normalized, body.productInput.layoutStyle)
+      planning: enforcePlanningLayout(normalized, body.productInput)
     });
   } catch (error) {
     return safeApiError(error);

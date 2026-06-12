@@ -1,3 +1,5 @@
+import type { ProductInput } from "@/types/prompt-generator";
+
 const DEFAULT_LAYOUT = "單一主體、清楚標註、充足留白";
 
 export const LAYOUT_PRESETS: Record<string, string> = {
@@ -36,28 +38,54 @@ export function buildLayoutRequirement(layoutStyle?: string) {
   return `指定構圖版型「${style}」：${getLayoutInstruction(style)}`;
 }
 
+export function buildCreativeDirection(input: ProductInput) {
+  const scene = input.sceneType?.trim() || "乾淨商業攝影棚";
+  const color = input.colorDirection?.trim() || "依指定美術風格建立協調配色";
+  return [
+    `構圖版型：${buildLayoutRequirement(input.layoutStyle)}`,
+    `美術風格：必須清楚呈現「${input.visualStyle}」的材質、光線、色調、字體氣質與影像質感，不得因版型限制而退化成通用資訊圖。`,
+    `使用場景：必須讓「${scene}」成為可辨識的環境、背景或情境元素；若版型以商品或技術結構為主，場景可簡化或景深化，但不可完全消失。`,
+    `配色方向：${color}。`,
+    "四項指令分工且必須同時成立：構圖只決定元素位置與比例；美術風格決定渲染語言；使用場景決定環境內容；配色決定色彩。不得用其中一項取代另一項。"
+  ].join("\n");
+}
+
 export function enforcePlanningLayout<T extends {
-  globalStyleRules: { layoutPrinciple: string };
-  cards: Array<{ compositionDescription: string }>;
-}>(planning: T, layoutStyle?: string): T {
-  const requirement = buildLayoutRequirement(layoutStyle);
+  globalStyleRules: {
+    visualStyle: string;
+    colorDirection: string;
+    layoutPrinciple: string;
+  };
+  cards: Array<{
+    compositionDescription: string;
+    sceneDescription: string;
+  }>;
+}>(planning: T, input: ProductInput): T {
+  const layoutRequirement = buildLayoutRequirement(input.layoutStyle);
   return {
     ...planning,
     globalStyleRules: {
       ...planning.globalStyleRules,
-      layoutPrinciple: requirement
+      visualStyle: `指定美術風格「${input.visualStyle}」；必須反映在材質、光線、色調、字體氣質與影像質感。`,
+      colorDirection: input.colorDirection?.trim() || planning.globalStyleRules.colorDirection,
+      layoutPrinciple: layoutRequirement
     },
-    cards: planning.cards.map((card) => enforceCardLayout(card, layoutStyle))
+    cards: planning.cards.map((card) => enforceCardLayout(card, input))
   };
 }
 
-export function enforceCardLayout<T extends { compositionDescription: string }>(
+export function enforceCardLayout<T extends {
+  compositionDescription: string;
+  sceneDescription: string;
+}>(
   card: T,
-  layoutStyle?: string
+  input: ProductInput
 ): T {
-  const requirement = buildLayoutRequirement(layoutStyle);
+  const layoutRequirement = buildLayoutRequirement(input.layoutStyle);
+  const scene = input.sceneType?.trim() || "乾淨商業攝影棚";
   return {
     ...card,
-    compositionDescription: `${requirement}\n本張細節：${card.compositionDescription || "依本張核心功能安排標註與視覺符號。"}`
+    compositionDescription: `${layoutRequirement}\n構圖只管理元素位置與比例，不得省略指定美術風格或使用場景。\n本張細節：${card.compositionDescription || "依本張核心功能安排標註與視覺符號。"}`,
+    sceneDescription: `指定使用場景「${scene}」必須可辨識；可依構圖簡化或景深化，但不可消失。\n本張場景細節：${card.sceneDescription || "將商品自然整合於指定場景。"}`
   };
 }

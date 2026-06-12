@@ -1,5 +1,5 @@
 import type { PlanningDraft, ProductInput } from "@/types/prompt-generator";
-import { buildLayoutRequirement } from "@/lib/layout-presets";
+import { buildCreativeDirection } from "@/lib/layout-presets";
 
 export const PLANNING_SYSTEM_PROMPT = `你是一位產品功能圖企劃師、電商視覺設計師、社群圖卡文案顧問與生圖 Prompt 工程師。
 
@@ -28,9 +28,9 @@ export function buildPlanningUserPrompt(input: ProductInput) {
 使用者提供資訊：
 ${JSON.stringify(input, null, 2)}
 
-強制構圖規格：
-${buildLayoutRequirement(input.layoutStyle)}
-上述規格的優先級高於 presentationType 與場景描述。presentationType 只能決定如何解說功能，不得替換指定構圖版型。
+強制創意方向：
+${buildCreativeDirection(input)}
+presentationType 只能決定如何解說功能，不得替換構圖版型、美術風格或使用場景。
 
 headline、subheadline、bulletPoints、featureMechanism 與 userBenefit 只能改寫上述產品資料，不得自行加入專利、認證、數據、療效或保證性說法。
 
@@ -82,7 +82,8 @@ export function buildPlanningRepairPrompt(input: ProductInput, invalidPlanning: 
 - cards 必須剛好有 ${input.outputCount} 張
 - cardIndex 必須依序為 ${Array.from({ length: input.outputCount }, (_, index) => index + 1).join("、")}
 - 每張只聚焦一個真實功能
-- 每張 compositionDescription 必須明確執行：${buildLayoutRequirement(input.layoutStyle)}
+- 每張 compositionDescription 與 sceneDescription 必須共同執行以下創意方向：
+${buildCreativeDirection(input)}
 - headline、subheadline、bulletPoints、featureMechanism 與 userBenefit 都不得加入產品資料中沒有的「專利、認證、數據、療效、保證」字樣
 - 保留完整 PlanningDraft 欄位
 - 只能輸出 JSON
@@ -100,9 +101,9 @@ export function buildFinalUserPrompt(input: ProductInput, planning: PlanningDraf
 產品資訊：
 ${JSON.stringify(input, null, 2)}
 
-最高優先構圖規格：
-${buildLayoutRequirement(input.layoutStyle)}
-最終 Image Prompt 必須逐字說清楚商品占比、文字區位置、標註方式與留白配置。不得改用其他版型；presentationType 只能輔助功能表達。
+最高優先創意方向：
+${buildCreativeDirection(input)}
+最終 Image Prompt 必須逐字說清楚商品占比、文字區位置、標註方式、留白配置、美術質感與場景環境。不得改用其他版型，也不得省略美術風格或使用場景；presentationType 只能輔助功能表達。
 
 最終確認企劃：
 ${JSON.stringify(planning, null, 2)}`;
