@@ -37,7 +37,8 @@ ${JSON.stringify(body.currentPlanningDraft.cards.filter((card) => card.cardIndex
 原始圖卡：
 ${JSON.stringify(target, null, 2)}
 
-compositionDescription 必須執行構圖版型，sceneDescription 必須保留指定場景，整張圖必須呈現指定美術風格。三者不得互相取代。`,
+compositionDescription 必須執行構圖版型，sceneDescription 必須保留指定場景，整張圖必須呈現指定美術風格。三者不得互相取代。
+bulletPoints 必須提供 2 至 3 項非空白短句，visualSymbols 必須提供 1 至 3 項可視覺化符號，並在 compositionDescription 指定它們的畫面位置。`,
       temperature: 0.8,
       responseFormat: "json"
     });

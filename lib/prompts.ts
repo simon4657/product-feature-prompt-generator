@@ -1,5 +1,5 @@
 import type { PlanningDraft, ProductInput } from "@/types/prompt-generator";
-import { buildCreativeDirection } from "@/lib/layout-presets";
+import { buildCreativeDirection, buildVisibleContentRequirement } from "@/lib/layout-presets";
 
 export const PLANNING_SYSTEM_PROMPT = `你是一位產品功能圖企劃師、電商視覺設計師、社群圖卡文案顧問與生圖 Prompt 工程師。
 
@@ -14,7 +14,8 @@ export const PLANNING_SYSTEM_PROMPT = `你是一位產品功能圖企劃師、�
 6. 輸出張數必須與使用者要求一致。
 7. 多張圖需維持同一系列感。
 8. 避免過多小字、重複文字、亂碼、九宮格、拼貼、分割畫面。
-9. 僅輸出 JSON，不要 Markdown、程式碼圍欄或解釋文字。`;
+9. 每張 bulletPoints 必須提供 2 至 3 項非空白短句，visualSymbols 必須提供 1 至 3 項可被視覺化的符號。
+10. 僅輸出 JSON，不要 Markdown、程式碼圍欄或解釋文字。`;
 
 export const REGENERATE_CARD_SYSTEM_PROMPT = `只重新生成指定功能圖企劃，不影響其他張圖。不得編造未提供的功能、認證、數據或療效，並維持全組一致視覺風格。`;
 
@@ -72,6 +73,7 @@ headline、subheadline、bulletPoints、featureMechanism 與 userBenefit 只能�
 }
 
 presentationType 只能是 decomposition、comparison、scenario、infographic 其中之一。
+每張 bulletPoints 必須有 2 至 3 項，visualSymbols 必須有 1 至 3 項；兩者都必須在 compositionDescription 中指定實際畫面位置。
 再次確認：cards 必須剛好有 ${input.outputCount} 個物件，不可省略、合併或增加。`;
 }
 
@@ -82,6 +84,7 @@ export function buildPlanningRepairPrompt(input: ProductInput, invalidPlanning: 
 - cards 必須剛好有 ${input.outputCount} 張
 - cardIndex 必須依序為 ${Array.from({ length: input.outputCount }, (_, index) => index + 1).join("、")}
 - 每張只聚焦一個真實功能
+- 每張 bulletPoints 必須有 2 至 3 項非空白短句，visualSymbols 必須有 1 至 3 項可見符號
 - 每張 compositionDescription 與 sceneDescription 必須共同執行以下創意方向：
 ${buildCreativeDirection(input)}
 - headline、subheadline、bulletPoints、featureMechanism 與 userBenefit 都不得加入產品資料中沒有的「專利、認證、數據、療效、保證」字樣
@@ -104,27 +107,36 @@ export function buildFinalUserPrompt(input: ProductInput, planning: PlanningDraf
       colorDirection: planning.globalStyleRules.colorDirection,
       consistencyRules: planning.globalStyleRules.consistencyRules
     },
-    cards: planning.cards.map((card) => ({
-      cardIndex: card.cardIndex,
-      featureTheme: card.featureTheme,
-      featureMechanism: card.featureMechanism,
-      userBenefit: card.userBenefit,
-      headline: card.headline,
-      subheadline: card.subheadline,
-      bulletPoints: card.bulletPoints,
-      visualSymbols: card.visualSymbols,
-      compositionDescription: card.compositionDescription
-        .replace(layoutPrefix.replace("構圖版型：", ""), "")
-        .replace("構圖只管理元素位置與比例，不得省略指定美術風格或使用場景。", "")
-        .replace("本張細節：", "")
-        .trim(),
-      sceneDescription: card.sceneDescription
-        .replace(`指定使用場景「${scene}」必須可辨識；可依構圖簡化或景深化，但不可消失。`, "")
-        .replace("本張場景細節：", "")
-        .trim(),
-      humanDescription: card.humanDescription,
-      negativePrompt: card.negativePrompt
-    }))
+    cards: planning.cards.map((card) => {
+      const visibleContentRequirement = buildVisibleContentRequirement(
+        input.layoutStyle,
+        card.bulletPoints,
+        card.visualSymbols
+      );
+      return {
+        cardIndex: card.cardIndex,
+        featureTheme: card.featureTheme,
+        featureMechanism: card.featureMechanism,
+        userBenefit: card.userBenefit,
+        headline: card.headline,
+        subheadline: card.subheadline,
+        bulletPoints: card.bulletPoints,
+        visualSymbols: card.visualSymbols,
+        visibleContentRequirement,
+        compositionDescription: card.compositionDescription
+          .replace(layoutPrefix.replace("構圖版型：", ""), "")
+          .replace(visibleContentRequirement, "")
+          .replace("構圖只管理元素位置與比例，不得省略指定美術風格或使用場景。", "")
+          .replace("本張細節：", "")
+          .trim(),
+        sceneDescription: card.sceneDescription
+          .replace(`指定使用場景「${scene}」必須可辨識；可依構圖簡化或景深化，但不可消失。`, "")
+          .replace("本張場景細節：", "")
+          .trim(),
+        humanDescription: card.humanDescription,
+        negativePrompt: card.negativePrompt
+      };
+    })
   };
 
   return `${FINAL_PROMPT_SYSTEM_PROMPT}
@@ -135,6 +147,7 @@ ${JSON.stringify(input, null, 2)}
 最高優先創意方向：
 ${buildCreativeDirection(input)}
 最終 Image Prompt 必須逐字說清楚商品占比、文字區位置、標註方式、留白配置、美術質感與場景環境。不得改用其他版型，也不得省略美術風格或使用場景；presentationType 只能輔助功能表達。
+每張 visibleContentRequirement 中的重點條列與視覺符號都是畫面必放元素，必須出現在 imagePrompt，並明確說明位置。
 
 最終確認企劃：
 ${JSON.stringify(compactPlanning, null, 2)}`;

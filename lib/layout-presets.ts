@@ -25,6 +25,29 @@ export const LAYOUT_PRESETS: Record<string, string> = {
     "使用單一完整使用情境作為約 70% 的主視覺，商品必須清楚可見；同一畫布側邊保留約 30% 乾淨區域，垂直排列主標與 2 至 3 項短條列。不得把文字區做成另一張圖片或分割成兩個畫面。"
 };
 
+const LAYOUT_CONTENT_PLACEMENTS: Record<string, string> = {
+  "單一主體、清楚標註、充足留白":
+    "將重點條列垂直放在商品側邊或下方留白區；每項前方配置對應視覺符號，並以短標註線連到商品部位。",
+  "中央商品加周圍功能標註":
+    "將重點條列改寫成商品周圍的放射狀短標註；每個視覺符號放在對應標註的起點或端點，不得另外塞入獨立資訊欄。",
+  "中央商品＋環形階段比較":
+    "將重點條列分配到環形階段的短說明或底部樣本標籤；視覺符號放入相對應的扇形區段，協助辨識各階段。",
+  "商品特寫加局部放大框":
+    "將重點條列放在放大框旁的留白資訊區；視覺符號作為條列圖示或放大框內的功能提示，避免遮擋商品。",
+  "結構拆解與分層剖面":
+    "將重點條列對應到各結構層的短標籤；視覺符號放在標註線端點或對應層旁，清楚連結功能與結構。",
+  "技術原理剖面＋側邊效果驗證":
+    "將重點條列放入右側效果驗證欄，維持 2 至 3 項；視覺符號分別放在作用路徑及驗證框標題旁。",
+  "單一畫面效果對照":
+    "將重點條列分布於效果變化兩側或底部說明列；視覺符號放在對應狀態旁，協助辨識變化但不可形成分割畫面。",
+  "雜誌式主視覺與資訊區":
+    "將重點條列置於單側資訊區並保持雜誌式對齊；視覺符號作為精簡條列圖示或小型視覺章，不得破壞精品留白。",
+  "極簡網格資訊圖":
+    "將每項重點條列配置在清楚對齊的網格資訊列；視覺符號與對應條列成組排列，但不得變成獨立卡片或九宮格。",
+  "情境主圖加側邊重點條列":
+    "將重點條列垂直放入側邊資訊區；每項前方必須配置一個對應視覺符號，主情境仍需保持完整可辨識。"
+};
+
 export function getLayoutStyle(layoutStyle?: string) {
   return layoutStyle && LAYOUT_PRESETS[layoutStyle] ? layoutStyle : DEFAULT_LAYOUT;
 }
@@ -36,6 +59,22 @@ export function getLayoutInstruction(layoutStyle?: string) {
 export function buildLayoutRequirement(layoutStyle?: string) {
   const style = getLayoutStyle(layoutStyle);
   return `指定構圖版型「${style}」：${getLayoutInstruction(style)}`;
+}
+
+export function buildVisibleContentRequirement(
+  layoutStyle: string | undefined,
+  bulletPoints: string[],
+  visualSymbols: string[]
+) {
+  const style = getLayoutStyle(layoutStyle);
+  const bullets = bulletPoints.map((item) => item.trim()).filter(Boolean).slice(0, 3);
+  const symbols = visualSymbols.map((item) => item.trim()).filter(Boolean).slice(0, 3);
+  return [
+    `重點條列（必須在畫面中可見）：${bullets.length ? bullets.map((item, index) => `${index + 1}. ${item}`).join("；") : "無已確認條列，不得自行編造"}`,
+    `視覺符號（必須轉成可見圖形）：${symbols.length ? symbols.join("、") : "無已選符號，不得自行增加"}`,
+    `配置方式：${LAYOUT_CONTENT_PLACEMENTS[style]}`,
+    "不得只把上述內容寫在 Prompt 說明中；必須實際安排在圖卡畫面。文字要短而清楚，符號要與對應功能相鄰。"
+  ].join("\n");
 }
 
 export function buildCreativeDirection(input: ProductInput) {
@@ -57,6 +96,8 @@ export function enforcePlanningLayout<T extends {
     layoutPrinciple: string;
   };
   cards: Array<{
+    bulletPoints: string[];
+    visualSymbols: string[];
     compositionDescription: string;
     sceneDescription: string;
   }>;
@@ -75,6 +116,8 @@ export function enforcePlanningLayout<T extends {
 }
 
 export function enforceCardLayout<T extends {
+  bulletPoints: string[];
+  visualSymbols: string[];
   compositionDescription: string;
   sceneDescription: string;
 }>(
@@ -82,10 +125,15 @@ export function enforceCardLayout<T extends {
   input: ProductInput
 ): T {
   const layoutRequirement = buildLayoutRequirement(input.layoutStyle);
+  const visibleContentRequirement = buildVisibleContentRequirement(
+    input.layoutStyle,
+    card.bulletPoints,
+    card.visualSymbols
+  );
   const scene = input.sceneType?.trim() || "乾淨商業攝影棚";
   return {
     ...card,
-    compositionDescription: `${layoutRequirement}\n構圖只管理元素位置與比例，不得省略指定美術風格或使用場景。\n本張細節：${card.compositionDescription || "依本張核心功能安排標註與視覺符號。"}`,
+    compositionDescription: `${layoutRequirement}\n${visibleContentRequirement}\n構圖只管理元素位置與比例，不得省略指定美術風格或使用場景。\n本張細節：${card.compositionDescription || "依本張核心功能安排標註與視覺符號。"}`,
     sceneDescription: `指定使用場景「${scene}」必須可辨識；可依構圖簡化或景深化，但不可消失。\n本張場景細節：${card.sceneDescription || "將商品自然整合於指定場景。"}`
   };
 }
