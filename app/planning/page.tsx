@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Layers3, LoaderCircle, RotateCcw, ShieldAlert } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
@@ -20,6 +20,7 @@ export default function PlanningPage() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const requestInFlight = useRef(false);
 
   useEffect(() => {
     setInput(loadStored<ProductInput>(STORAGE_KEYS.input));
@@ -39,7 +40,8 @@ export default function PlanningPage() {
   const activeCard = planning.cards[activeIndex];
 
   async function regenerateAll() {
-    if (!apiSettings) return;
+    if (!apiSettings || requestInFlight.current) return;
+    requestInFlight.current = true;
     setLoading(true);
     setError("");
     try {
@@ -55,12 +57,14 @@ export default function PlanningPage() {
     } catch (regenerateError) {
       setError(regenerateError instanceof Error ? regenerateError.message : "重新生成企劃失敗。");
     } finally {
+      requestInFlight.current = false;
       setLoading(false);
     }
   }
 
   async function regenerateCard() {
-    if (!apiSettings) return;
+    if (!apiSettings || requestInFlight.current) return;
+    requestInFlight.current = true;
     setLoading(true);
     setError("");
     try {
@@ -82,12 +86,14 @@ export default function PlanningPage() {
     } catch (cardError) {
       setError(cardError instanceof Error ? cardError.message : "重新生成本張失敗。");
     } finally {
+      requestInFlight.current = false;
       setLoading(false);
     }
   }
 
   async function generateFinal() {
-    if (!apiSettings) return;
+    if (!apiSettings || requestInFlight.current) return;
+    requestInFlight.current = true;
     setLoading(true);
     setError("");
     try {
@@ -102,6 +108,8 @@ export default function PlanningPage() {
       router.push("/output");
     } catch (finalError) {
       setError(finalError instanceof Error ? finalError.message : "Prompt 生成失敗。");
+    } finally {
+      requestInFlight.current = false;
       setLoading(false);
     }
   }
@@ -113,7 +121,7 @@ export default function PlanningPage() {
         <StepNav current={2} />
         <div className="page-intro planning-intro">
           <div><span className="eyebrow">STEP 02 / EDIT THE PLAN</span><h1>讓每張圖，只說一件事。</h1></div>
-          <div className="intro-actions"><button className="button ghost" onClick={regenerateAll} disabled={loading}>{loading ? <LoaderCircle className="spin" size={16} /> : <RotateCcw size={16} />} 重生全部企劃</button><button className="button primary" onClick={generateFinal}>確認並生成 Prompts <ArrowRight size={16} /></button></div>
+          <div className="intro-actions"><button className="button ghost" onClick={regenerateAll} disabled={loading}>{loading ? <LoaderCircle className="spin" size={16} /> : <RotateCcw size={16} />} 重生全部企劃</button><button className="button primary" onClick={generateFinal} disabled={loading}>確認並生成 Prompts <ArrowRight size={16} /></button></div>
         </div>
         <div className="planning-layout">
           <aside className="panel planning-sidebar">
@@ -126,6 +134,7 @@ export default function PlanningPage() {
           <section className="panel editor-panel">
             <FeatureCardEditor
               card={activeCard}
+              loading={loading}
               onChange={(nextCard) => setPlanning({ ...planning, cards: planning.cards.map((card, index) => index === activeIndex ? nextCard : card) })}
               onRegenerate={regenerateCard}
             />

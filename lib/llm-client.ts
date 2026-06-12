@@ -51,8 +51,13 @@ async function readProviderErrorDetail(response: Response): Promise<ProviderErro
   };
 }
 
+function isRateLimitError(detail: ProviderErrorDetail) {
+  return /rate.?limit|too many requests|rpm|tpm|throttl|频繁|限流/.test(detail.combined);
+}
+
 function isQuotaError(detail: ProviderErrorDetail) {
-  return /insufficient|quota|balance|credit|billing|余额|餘額|额度|額度/.test(detail.combined);
+  return !isRateLimitError(detail)
+    && /insufficient|quota|balance|credit|billing|余额|餘額|额度|額度/.test(detail.combined);
 }
 
 function isContextError(detail: ProviderErrorDetail) {
@@ -66,7 +71,7 @@ function providerError(status: number, provider: LLMProvider, detail: ProviderEr
     return "Kimi API 帳戶餘額或額度不足，請至 Moonshot 開放平台確認帳戶餘額。";
   }
   if (status === 429 && provider === "kimi") {
-    return "Kimi API 目前超過速率限制，系統已自動重試；請稍候約 30 秒再試。";
+    return "Kimi API 仍處於速率限制，系統已等待並重試 2 次。請稍候 30 至 60 秒後再試。";
   }
   if (status === 429) return "API 額度不足或請求過於頻繁。";
   if (status === 400 && provider === "kimi" && isContextError(detail)) {
@@ -79,12 +84,19 @@ function providerError(status: number, provider: LLMProvider, detail: ProviderEr
   return `模型服務請求失敗 (${status})。`;
 }
 
-function retryDelayMs(response: Response) {
-  const retryAfter = Number(response.headers.get("retry-after"));
-  if (Number.isFinite(retryAfter) && retryAfter > 0) {
-    return Math.min(retryAfter * 1000, 10000);
+function retryDelayMs(response: Response, attempt: number) {
+  const retryAfterValue = response.headers.get("retry-after");
+  if (retryAfterValue) {
+    const retryAfterSeconds = Number(retryAfterValue);
+    if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+      return Math.min(retryAfterSeconds * 1000, 30000);
+    }
+    const retryAt = Date.parse(retryAfterValue);
+    if (Number.isFinite(retryAt)) {
+      return Math.min(Math.max(retryAt - Date.now(), 1000), 30000);
+    }
   }
-  return 2500;
+  return attempt === 0 ? 10000 : 20000;
 }
 
 function wait(ms: number) {
@@ -235,7 +247,7 @@ async function callGemini(request: LLMRequest): Promise<LLMResponse> {
 }
 
 async function callKimi(request: LLMRequest): Promise<LLMResponse> {
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
     const response = await fetchWithTimeout(`${DEFAULT_BASE_URLS.kimi}/chat/completions`, {
       method: "POST",
       headers: {
@@ -263,14 +275,14 @@ async function callKimi(request: LLMRequest): Promise<LLMResponse> {
     const detail = await readProviderErrorDetail(response);
     const shouldRetry = response.status === 429
       && !isQuotaError(detail)
-      && attempt === 0;
+      && attempt < 2;
     if (shouldRetry) {
-      await wait(retryDelayMs(response));
+      await wait(retryDelayMs(response, attempt));
       continue;
     }
     throw new Error(providerError(response.status, "kimi", detail));
   }
-  throw new Error("Kimi API 目前超過速率限制，請稍候約 30 秒再試。");
+  throw new Error("Kimi API 仍處於速率限制，系統已等待並重試 2 次。請稍候 30 至 60 秒後再試。");
 }
 
 export async function callLLM(request: LLMRequest): Promise<LLMResponse> {

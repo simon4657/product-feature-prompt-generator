@@ -5,6 +5,7 @@ import type { FeatureCardDraft, PresentationType } from "@/types/prompt-generato
 
 type Props = {
   card: FeatureCardDraft;
+  loading?: boolean;
   onChange: (card: FeatureCardDraft) => void;
   onRegenerate: () => void;
 };
@@ -29,7 +30,7 @@ const visualSymbolPresets = [
   "Before / After 分界"
 ];
 
-export function FeatureCardEditor({ card, onChange, onRegenerate }: Props) {
+export function FeatureCardEditor({ card, loading = false, onChange, onRegenerate }: Props) {
   function update<K extends keyof FeatureCardDraft>(key: K, value: FeatureCardDraft[K]) {
     onChange({ ...card, [key]: value });
   }
@@ -60,7 +61,9 @@ export function FeatureCardEditor({ card, onChange, onRegenerate }: Props) {
     <div className="card-editor">
       <div className="editor-heading">
         <div><span>PAGE {String(card.cardIndex).padStart(2, "0")}</span><h2>{card.featureTheme || "未命名功能"}</h2><p>{card.pageRole}</p></div>
-        <button type="button" className="button ghost" onClick={onRegenerate}><RotateCcw size={15} /> 重新生成本張</button>
+        <button type="button" className="button ghost" onClick={onRegenerate} disabled={loading}>
+          <RotateCcw className={loading ? "spin" : ""} size={15} /> {loading ? "生成中" : "重新生成本張"}
+        </button>
       </div>
       <div className="field-grid two">
         <label className="field"><span>功能主題</span><input value={card.featureTheme} onChange={(e) => update("featureTheme", e.target.value)} /></label>
