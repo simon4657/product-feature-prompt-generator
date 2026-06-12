@@ -67,8 +67,10 @@ const aspectRatioOptions: { value: AspectRatioPreference; label: string; hint: s
 const layoutStyleOptions = [
   "單一主體、清楚標註、充足留白",
   "中央商品加周圍功能標註",
+  "中央商品＋環形階段比較",
   "商品特寫加局部放大框",
   "結構拆解與分層剖面",
+  "技術原理剖面＋側邊效果驗證",
   "單一畫面效果對照",
   "雜誌式主視覺與資訊區",
   "極簡網格資訊圖",
