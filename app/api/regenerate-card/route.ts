@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { safeApiError, validateApiSettings } from "@/lib/api-route-utils";
 import { callLLM } from "@/lib/llm-client";
-import { buildCreativeDirection, enforceCardLayout } from "@/lib/layout-presets";
+import {
+  buildAdditionalNotesRequirement,
+  buildCreativeDirection,
+  enforceCardLayout
+} from "@/lib/layout-presets";
 import { parseLLMJson } from "@/lib/parse-llm";
 import { REGENERATE_CARD_SYSTEM_PROMPT } from "@/lib/prompts";
 import type { ApiKeySettings, FeatureCardDraft, PlanningDraft, ProductInput } from "@/types/prompt-generator";
@@ -27,6 +31,7 @@ ${JSON.stringify(body.productInput, null, 2)}
 
 強制創意方向（三者必須同時呈現）：
 ${buildCreativeDirection(body.productInput)}
+${body.productInput.additionalNotes?.trim() ? `\n${buildAdditionalNotesRequirement(body.productInput)}` : ""}
 
 全組風格：
 ${JSON.stringify(body.currentPlanningDraft.globalStyleRules, null, 2)}

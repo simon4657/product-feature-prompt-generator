@@ -1,5 +1,9 @@
 import type { PlanningDraft, ProductInput } from "@/types/prompt-generator";
-import { buildCreativeDirection, buildVisibleContentRequirement } from "@/lib/layout-presets";
+import {
+  buildAdditionalNotesRequirement,
+  buildCreativeDirection,
+  buildVisibleContentRequirement
+} from "@/lib/layout-presets";
 
 export const PLANNING_SYSTEM_PROMPT = `你是一位產品功能圖企劃師、電商視覺設計師、社群圖卡文案顧問與生圖 Prompt 工程師。
 
@@ -32,6 +36,7 @@ ${JSON.stringify(input, null, 2)}
 強制創意方向：
 ${buildCreativeDirection(input)}
 presentationType 只能決定如何解說功能，不得替換構圖版型、美術風格或使用場景。
+${input.additionalNotes?.trim() ? `${buildAdditionalNotesRequirement(input)}\n補充說明必須轉化為 globalStyleRules.consistencyRules，並落實在每張 compositionDescription 或 sceneDescription 中。` : ""}
 
 headline、subheadline、bulletPoints、featureMechanism 與 userBenefit 只能改寫上述產品資料，不得自行加入專利、認證、數據、療效或保證性說法。
 
@@ -87,6 +92,7 @@ export function buildPlanningRepairPrompt(input: ProductInput, invalidPlanning: 
 - 每張 bulletPoints 必須有 2 至 3 項非空白短句，visualSymbols 必須有 1 至 3 項可見符號
 - 每張 compositionDescription 與 sceneDescription 必須共同執行以下創意方向：
 ${buildCreativeDirection(input)}
+${input.additionalNotes?.trim() ? `- ${buildAdditionalNotesRequirement(input)}\n- 使用者補充說明必須保留在 globalStyleRules.consistencyRules，並落實到每張圖卡` : ""}
 - headline、subheadline、bulletPoints、featureMechanism 與 userBenefit 都不得加入產品資料中沒有的「專利、認證、數據、療效、保證」字樣
 - 保留完整 PlanningDraft 欄位
 - 只能輸出 JSON
@@ -100,6 +106,7 @@ ${JSON.stringify(invalidPlanning, null, 2)}`;
 
 export function buildFinalUserPrompt(input: ProductInput, planning: PlanningDraft) {
   const layoutPrefix = buildCreativeDirection(input).split("\n")[0];
+  const additionalNotesRequirement = buildAdditionalNotesRequirement(input);
   const scene = input.sceneType?.trim() || "乾淨商業攝影棚";
   const compactPlanning = {
     globalStyleRules: {
@@ -126,6 +133,7 @@ export function buildFinalUserPrompt(input: ProductInput, planning: PlanningDraf
         compositionDescription: card.compositionDescription
           .replace(layoutPrefix.replace("構圖版型：", ""), "")
           .replace(visibleContentRequirement, "")
+          .replace(additionalNotesRequirement, "")
           .replace("構圖只管理元素位置與比例，不得省略指定美術風格或使用場景。", "")
           .replace("本張細節：", "")
           .trim(),
@@ -148,6 +156,7 @@ ${JSON.stringify(input, null, 2)}
 ${buildCreativeDirection(input)}
 最終 Image Prompt 必須逐字說清楚商品占比、文字區位置、標註方式、留白配置、美術質感與場景環境。不得改用其他版型，也不得省略美術風格或使用場景；presentationType 只能輔助功能表達。
 每張 visibleContentRequirement 中的重點條列與視覺符號都是畫面必放元素，必須出現在 imagePrompt，並明確說明位置。
+${additionalNotesRequirement ? `使用者補充說明是最終 Prompt 的必放規則：${additionalNotesRequirement}` : ""}
 
 最終確認企劃：
 ${JSON.stringify(compactPlanning, null, 2)}`;

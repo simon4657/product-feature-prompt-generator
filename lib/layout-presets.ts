@@ -61,6 +61,12 @@ export function buildLayoutRequirement(layoutStyle?: string) {
   return `指定構圖版型「${style}」：${getLayoutInstruction(style)}`;
 }
 
+export function buildAdditionalNotesRequirement(input: ProductInput) {
+  const notes = input.additionalNotes?.trim();
+  if (!notes) return "";
+  return `使用者補充說明（全流程必須執行）：${notes}。若與產品事實或禁止誇大規則衝突，以產品事實與禁止誇大規則為準；其餘內容不得省略。`;
+}
+
 export function buildVisibleContentRequirement(
   layoutStyle: string | undefined,
   bulletPoints: string[],
@@ -86,7 +92,7 @@ export function buildCreativeDirection(input: ProductInput) {
     `使用場景：必須讓「${scene}」成為可辨識的環境、背景或情境元素；若版型以商品或技術結構為主，場景可簡化或景深化，但不可完全消失。`,
     `配色方向：${color}。`,
     "四項指令分工且必須同時成立：構圖只決定元素位置與比例；美術風格決定渲染語言；使用場景決定環境內容；配色決定色彩。不得用其中一項取代另一項。"
-  ].join("\n");
+  ].filter(Boolean).join("\n");
 }
 
 export function enforcePlanningLayout<T extends {
@@ -94,6 +100,7 @@ export function enforcePlanningLayout<T extends {
     visualStyle: string;
     colorDirection: string;
     layoutPrinciple: string;
+    consistencyRules: string[];
   };
   cards: Array<{
     bulletPoints: string[];
@@ -103,13 +110,20 @@ export function enforcePlanningLayout<T extends {
   }>;
 }>(planning: T, input: ProductInput): T {
   const layoutRequirement = buildLayoutRequirement(input.layoutStyle);
+  const additionalNotesRequirement = buildAdditionalNotesRequirement(input);
   return {
     ...planning,
     globalStyleRules: {
       ...planning.globalStyleRules,
       visualStyle: `指定美術風格「${input.visualStyle}」；必須反映在材質、光線、色調、字體氣質與影像質感。`,
       colorDirection: input.colorDirection?.trim() || planning.globalStyleRules.colorDirection,
-      layoutPrinciple: layoutRequirement
+      layoutPrinciple: layoutRequirement,
+      consistencyRules: additionalNotesRequirement
+        ? [
+            ...planning.globalStyleRules.consistencyRules.filter((rule) => rule !== additionalNotesRequirement),
+            additionalNotesRequirement
+          ]
+        : planning.globalStyleRules.consistencyRules
     },
     cards: planning.cards.map((card) => enforceCardLayout(card, input))
   };
@@ -130,10 +144,11 @@ export function enforceCardLayout<T extends {
     card.bulletPoints,
     card.visualSymbols
   );
+  const additionalNotesRequirement = buildAdditionalNotesRequirement(input);
   const scene = input.sceneType?.trim() || "乾淨商業攝影棚";
   return {
     ...card,
-    compositionDescription: `${layoutRequirement}\n${visibleContentRequirement}\n構圖只管理元素位置與比例，不得省略指定美術風格或使用場景。\n本張細節：${card.compositionDescription || "依本張核心功能安排標註與視覺符號。"}`,
+    compositionDescription: `${layoutRequirement}\n${visibleContentRequirement}${additionalNotesRequirement ? `\n${additionalNotesRequirement}` : ""}\n構圖只管理元素位置與比例，不得省略指定美術風格或使用場景。\n本張細節：${card.compositionDescription || "依本張核心功能安排標註與視覺符號。"}`,
     sceneDescription: `指定使用場景「${scene}」必須可辨識；可依構圖簡化或景深化，但不可消失。\n本張場景細節：${card.sceneDescription || "將商品自然整合於指定場景。"}`
   };
 }
