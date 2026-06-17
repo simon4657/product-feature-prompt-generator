@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Bookmark, Check, ImagePlus, LoaderCircle, Settings2, ShieldCheck, Sparkles, Trash2 } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
@@ -102,6 +102,7 @@ export default function CreatePage() {
   const router = useRouter();
   const { settings: apiSettings, ready } = useApiGuard();
   const [form, setForm] = useState<ProductInput>(initialInput);
+  const formRef = useRef<ProductInput>(initialInput);
   const [memorySlots, setMemorySlots] = useState<MemorySlot[]>(Array(5).fill(null));
   const [memoryMessage, setMemoryMessage] = useState("");
   const [generatingField, setGeneratingField] = useState<GeneratingField | null>(null);
@@ -110,7 +111,11 @@ export default function CreatePage() {
 
   useEffect(() => {
     const saved = loadStored<ProductInput & { presentationPreference?: unknown }>(STORAGE_KEYS.input);
-    if (saved) setForm(normalizeProductInput(saved));
+    if (saved) {
+      const normalized = normalizeProductInput(saved);
+      formRef.current = normalized;
+      setForm(normalized);
+    }
     const savedSlots = loadStored<Array<(ProductInput & { presentationPreference?: unknown }) | null>>(MEMORY_STORAGE_KEY);
     if (savedSlots) {
       setMemorySlots(Array.from(
@@ -121,11 +126,16 @@ export default function CreatePage() {
   }, []);
 
   useEffect(() => {
+    formRef.current = form;
     saveStored(STORAGE_KEYS.input, form);
   }, [form]);
 
   function update<K extends keyof ProductInput>(key: K, value: ProductInput[K]) {
-    setForm((current) => ({ ...current, [key]: value }));
+    setForm((current) => {
+      const next = { ...current, [key]: value };
+      formRef.current = next;
+      return next;
+    });
   }
 
   function showMemoryMessage(message: string) {
@@ -136,6 +146,7 @@ export default function CreatePage() {
   function handleMemorySlot(index: number) {
     const saved = memorySlots[index];
     if (saved) {
+      formRef.current = saved;
       setForm(saved);
       showMemoryMessage(`已載入記憶 ${index + 1}`);
       return;
@@ -157,8 +168,9 @@ export default function CreatePage() {
   }
 
   async function generateField(field: GeneratingField) {
-    if (!form.productName.trim() || !form.productType.trim()) {
-      setError("請先填寫商品名稱與商品類型，AI 才能產生合適草稿。");
+    const currentForm = formRef.current;
+    if (!currentForm.productName.trim() || !currentForm.productType.trim()) {
+      setError("請先填寫功能名稱與商品類型，AI 才能產生合適草稿。");
       return;
     }
     if (!apiSettings) return;
@@ -169,7 +181,7 @@ export default function CreatePage() {
       const response = await fetch("/api/generate-field", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiSettings, productInput: form, field })
+        body: JSON.stringify({ apiSettings, productInput: currentForm, field })
       });
       const data = await readApiResponse<{ success: boolean; message?: string; content: string }>(response);
       if (!response.ok || !data.success) throw new Error(data.message || "AI 生成失敗。");
@@ -181,7 +193,11 @@ export default function CreatePage() {
         forbidden: "forbiddenClaims",
         notes: "additionalNotes"
       };
-      setForm((current) => ({ ...current, [targets[field]]: data.content }));
+      setForm((current) => {
+        const next = { ...current, [targets[field]]: data.content };
+        formRef.current = next;
+        return next;
+      });
     } catch (generateError) {
       setError(generateError instanceof Error ? generateError.message : "AI 生成失敗。");
     } finally {
@@ -192,7 +208,7 @@ export default function CreatePage() {
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!form.productName.trim() || !form.productType.trim() || !form.realFeatures.trim()) {
-      setError("請先完成商品名稱、類型與真實功能清單。");
+      setError("請先完成功能名稱、商品類型與真實功能清單。");
       return;
     }
     if (form.realFeatures.includes("[待確認]")) {
@@ -233,9 +249,9 @@ export default function CreatePage() {
         </div>
         <form className="form-layout" onSubmit={handleSubmit}>
           <section className="panel form-panel">
-            <div className="panel-title"><span>01</span><div><h2>商品基本資料</h2><p>建立所有功能圖共同遵循的商品事實。</p></div></div>
+            <div className="panel-title"><span>01</span><div><h2>功能基本資料</h2><p>建立所有功能圖共同遵循的商品事實。</p></div></div>
             <div className="field-grid two">
-              <label className="field"><span>商品名稱 <b>必填</b></span><input value={form.productName} onChange={(e) => update("productName", e.target.value)} placeholder="例：AeroShade 運動眼鏡" /></label>
+              <label className="field"><span>功能名稱 <b>必填</b></span><input value={form.productName} onChange={(e) => update("productName", e.target.value)} placeholder="例：VIV20 變色鏡片技術" /></label>
               <label className="field"><span>商品類型 <b>必填</b></span><input value={form.productType} onChange={(e) => update("productType", e.target.value)} placeholder="例：戶外運動眼鏡" /></label>
             </div>
             <label className={`reference-toggle ${form.hasReferenceImage ? "selected" : ""}`}>
@@ -361,7 +377,7 @@ export default function CreatePage() {
             <div className="brief-cover">
               <small>{String(form.outputCount).padStart(2, "0")} CARDS / SERIES</small>
               <div className="brief-object"><div><span>{form.productName ? form.productName.slice(0, 2).toUpperCase() : "PF"}</span></div><i /><i /></div>
-              <h3>{form.productName || "你的商品名稱"}</h3>
+              <h3>{form.productName || "你的功能名稱"}</h3>
               <p>{form.visualStyle}</p>
             </div>
             <dl className="brief-list">
