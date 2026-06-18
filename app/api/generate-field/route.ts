@@ -7,7 +7,7 @@ type FieldName = "appearance" | "features" | "layout" | "scene" | "forbidden" | 
 
 function fieldInstruction(field: FieldName, input: ProductInput) {
   const featureName = input.productName.trim() || "未命名功能";
-  const baseContext = `目前功能名稱：「${featureName}」。商品類型：「${input.productType.trim() || "未填寫"}」。生成內容必須直接對應此功能名稱，不可只依商品類型產生通用文字。`;
+  const baseContext = `目前功能名稱：「${featureName}」。商品類型：「${input.productType.trim() || "未填寫"}」。這是重新生成請求，請直接產出可覆蓋原欄位的新內容；不得沿用、補寫、摘要或引用原欄位既有文字。生成內容必須直接對應此功能名稱，不可只依商品類型產生通用文字。`;
   const instructions: Record<FieldName, string> = {
     appearance: "產出一段可編輯的商品外觀描述，涵蓋顏色、材質、輪廓、比例、關鍵零件與不可變動特徵。資訊不足處明確寫「需確認」，不得自行斷言。",
     features: `針對功能名稱「${featureName}」列出 3 至 5 項可能的真實功能候選，每行一項且以「[待確認]」開頭。每項都必須能看出與「${featureName}」的關聯，不可只輸出商品類型的泛用功能。不得把候選寫成已證實事實，不得加入認證、數據或療效。`,

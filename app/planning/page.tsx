@@ -10,6 +10,7 @@ import { StepNav } from "@/components/StepNav";
 import { loadStored, saveStored } from "@/lib/storage";
 import { useApiGuard } from "@/lib/use-api-guard";
 import { readApiResponse } from "@/lib/client-api";
+import { normalizeFeatureCardDraft, normalizePlanningDraft } from "@/lib/normalize-planning";
 import { STORAGE_KEYS, type FeatureCardDraft, type FinalPromptOutput, type PlanningDraft, type ProductInput } from "@/types/prompt-generator";
 
 type LoadingAction = "all" | "card" | "final" | null;
@@ -25,8 +26,10 @@ export default function PlanningPage() {
   const requestInFlight = useRef(false);
 
   useEffect(() => {
-    setInput(loadStored<ProductInput>(STORAGE_KEYS.input));
-    setPlanning(loadStored<PlanningDraft>(STORAGE_KEYS.planning));
+    const storedInput = loadStored<ProductInput>(STORAGE_KEYS.input);
+    const storedPlanning = loadStored<PlanningDraft>(STORAGE_KEYS.planning);
+    setInput(storedInput);
+    setPlanning(storedPlanning ? normalizePlanningDraft(storedPlanning, storedInput || undefined) : null);
   }, []);
 
   useEffect(() => {
@@ -54,7 +57,7 @@ export default function PlanningPage() {
       });
       const data = await readApiResponse<{ success: boolean; message?: string; planning: PlanningDraft }>(response);
       if (!response.ok || !data.success) throw new Error(data.message || "重新生成企劃失敗。");
-      setPlanning(data.planning);
+      setPlanning(normalizePlanningDraft(data.planning, input || undefined));
       setActiveIndex(0);
     } catch (regenerateError) {
       setError(regenerateError instanceof Error ? regenerateError.message : "重新生成企劃失敗。");
@@ -82,8 +85,9 @@ export default function PlanningPage() {
       });
       const data = await readApiResponse<{ success: boolean; message?: string; card: FeatureCardDraft }>(response);
       if (!response.ok || !data.success) throw new Error(data.message || "重新生成本張失敗。");
+      const normalizedCard = normalizeFeatureCardDraft(data.card, activeIndex, input || undefined);
       setPlanning((current) => current
-        ? { ...current, cards: current.cards.map((card) => card.cardIndex === activeCard.cardIndex ? data.card : card) }
+        ? { ...current, cards: current.cards.map((card) => card.cardIndex === activeCard.cardIndex ? normalizedCard : card) }
         : current);
     } catch (cardError) {
       setError(cardError instanceof Error ? cardError.message : "重新生成本張失敗。");

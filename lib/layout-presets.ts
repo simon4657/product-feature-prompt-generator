@@ -67,14 +67,44 @@ export function buildAdditionalNotesRequirement(input: ProductInput) {
   return `使用者補充說明（全流程必須執行）：${notes}。若與產品事實或禁止誇大規則衝突，以產品事實與禁止誇大規則為準；其餘內容不得省略。`;
 }
 
+export function buildReferenceImageRequirement(input: ProductInput) {
+  if (!input.hasReferenceImage) return "";
+  return [
+    "參考圖／墊圖外觀鎖定（最高優先）：使用者會提供商品參考圖，圖中的商品外觀是唯一準則。",
+    "不得重新設計商品，不得改變產品輪廓、長寬比例、厚薄、曲率、孔位、接縫、鏡片形狀、框架結構、Logo 位置、材質分布或任何關鍵零件。",
+    "可加入光線、標註、放大框、背景、場景與資訊圖元素，但所有新增元素都必須圍繞原商品，不得遮擋、拉伸、扭曲、切斷、融化、複製或替換商品主體。",
+    "若構圖需要拆解、剖面、分層或效果對照，仍必須保持原商品比例與可辨識輪廓；只能用透明層、標註線或外加示意，不可讓主商品變形。"
+  ].join("\n");
+}
+
+export function buildHumanPresenceRequirement(input: ProductInput) {
+  const requirements: Record<ProductInput["humanPresence"], string> = {
+    auto: "人物設定：AI 依使用場景、構圖版型與功能表達決定是否加入人物；若加入人物，必須自然服務產品功能，不可遮擋商品或主要標註。",
+    none: "人物設定：無人物。畫面不得出現真人、模特兒、手部、腳部或任何人體局部；只能使用商品、場景、標註與資訊圖元素。",
+    model: "人物設定：必須有人物。可呈現自然使用中的模特兒或使用者，但商品仍需清楚可見，不可讓人物搶走主體。",
+    hand: "人物設定：必須呈現手部特寫或手持示範。手部只能輔助展示商品比例、材質或操作方式，不可遮擋功能重點。",
+    foot: "人物設定：必須呈現腳部特寫或腳部使用示範，僅在商品類型適合腳部情境時使用；商品與功能重點需清楚可見。",
+    wearing_demo: "人物設定：必須呈現模特兒配戴／穿戴商品的示範畫面。不得寫成無人物；模特兒需自然展示商品使用狀態，商品外觀與功能標註仍需清楚。"
+  };
+  return requirements[input.humanPresence] || requirements.none;
+}
+
+export function resolveHumanDescription(input: ProductInput, generatedDescription?: string) {
+  const generated = generatedDescription?.trim();
+  if (input.humanPresence === "auto") {
+    return generated || "AI 依情境決定是否加入人物；若有人物，不可遮擋商品與功能標註。";
+  }
+  return buildHumanPresenceRequirement(input).replace(/^人物設定：/, "");
+}
+
 export function buildVisibleContentRequirement(
   layoutStyle: string | undefined,
   bulletPoints: string[],
   visualSymbols: string[]
 ) {
   const style = getLayoutStyle(layoutStyle);
-  const bullets = bulletPoints.map((item) => item.trim()).filter(Boolean).slice(0, 3);
-  const symbols = visualSymbols.map((item) => item.trim()).filter(Boolean).slice(0, 3);
+  const bullets = (Array.isArray(bulletPoints) ? bulletPoints : []).map((item) => item.trim()).filter(Boolean).slice(0, 3);
+  const symbols = (Array.isArray(visualSymbols) ? visualSymbols : []).map((item) => item.trim()).filter(Boolean).slice(0, 3);
   return [
     `重點條列（必須在畫面中可見）：${bullets.length ? bullets.map((item, index) => `${index + 1}. ${item}`).join("；") : "無已確認條列，不得自行編造"}`,
     `視覺符號（必須轉成可見圖形）：${symbols.length ? symbols.join("、") : "無已選符號，不得自行增加"}`,
@@ -86,7 +116,10 @@ export function buildVisibleContentRequirement(
 export function buildCreativeDirection(input: ProductInput) {
   const scene = input.sceneType?.trim() || "乾淨商業攝影棚";
   const color = input.colorDirection?.trim() || "依指定美術風格建立協調配色";
+  const referenceImageRequirement = buildReferenceImageRequirement(input);
   return [
+    referenceImageRequirement,
+    buildHumanPresenceRequirement(input),
     `構圖版型：${buildLayoutRequirement(input.layoutStyle)}`,
     `美術風格：必須清楚呈現「${input.visualStyle}」的材質、光線、色調、字體氣質與影像質感，不得因版型限制而退化成通用資訊圖。`,
     `使用場景：必須讓「${scene}」成為可辨識的環境、背景或情境元素；若版型以商品或技術結構為主，場景可簡化或景深化，但不可完全消失。`,
@@ -107,6 +140,7 @@ export function enforcePlanningLayout<T extends {
     visualSymbols: string[];
     compositionDescription: string;
     sceneDescription: string;
+    humanDescription: string;
   }>;
 }>(planning: T, input: ProductInput): T {
   const layoutRequirement = buildLayoutRequirement(input.layoutStyle);
@@ -120,12 +154,12 @@ export function enforcePlanningLayout<T extends {
       layoutPrinciple: layoutRequirement,
       consistencyRules: additionalNotesRequirement
         ? [
-            ...planning.globalStyleRules.consistencyRules.filter((rule) => rule !== additionalNotesRequirement),
+            ...(Array.isArray(planning.globalStyleRules.consistencyRules) ? planning.globalStyleRules.consistencyRules : []).filter((rule) => rule !== additionalNotesRequirement),
             additionalNotesRequirement
           ]
-        : planning.globalStyleRules.consistencyRules
+        : Array.isArray(planning.globalStyleRules.consistencyRules) ? planning.globalStyleRules.consistencyRules : []
     },
-    cards: planning.cards.map((card) => enforceCardLayout(card, input))
+    cards: (Array.isArray(planning.cards) ? planning.cards : []).map((card) => enforceCardLayout(card, input))
   };
 }
 
@@ -134,6 +168,7 @@ export function enforceCardLayout<T extends {
   visualSymbols: string[];
   compositionDescription: string;
   sceneDescription: string;
+  humanDescription: string;
 }>(
   card: T,
   input: ProductInput
@@ -149,6 +184,7 @@ export function enforceCardLayout<T extends {
   return {
     ...card,
     compositionDescription: `${layoutRequirement}\n${visibleContentRequirement}${additionalNotesRequirement ? `\n${additionalNotesRequirement}` : ""}\n構圖只管理元素位置與比例，不得省略指定美術風格或使用場景。\n本張細節：${card.compositionDescription || "依本張核心功能安排標註與視覺符號。"}`,
-    sceneDescription: `指定使用場景「${scene}」必須可辨識；可依構圖簡化或景深化，但不可消失。\n本張場景細節：${card.sceneDescription || "將商品自然整合於指定場景。"}`
+    sceneDescription: `指定使用場景「${scene}」必須可辨識；可依構圖簡化或景深化，但不可消失。\n本張場景細節：${card.sceneDescription || "將商品自然整合於指定場景。"}`,
+    humanDescription: resolveHumanDescription(input, card.humanDescription)
   };
 }

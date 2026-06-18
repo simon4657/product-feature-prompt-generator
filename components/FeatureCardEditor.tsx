@@ -31,30 +31,35 @@ const visualSymbolPresets = [
 ];
 
 export function FeatureCardEditor({ card, loading = false, onChange, onRegenerate }: Props) {
+  const bulletPoints = Array.isArray(card.bulletPoints) ? card.bulletPoints : [];
+  const visualSymbols = Array.isArray(card.visualSymbols) ? card.visualSymbols : [];
+  const negativePrompt = Array.isArray(card.negativePrompt) ? card.negativePrompt : [];
+  const listValues = { bulletPoints, visualSymbols, negativePrompt };
+
   function update<K extends keyof FeatureCardDraft>(key: K, value: FeatureCardDraft[K]) {
     onChange({ ...card, [key]: value });
   }
 
   function updateList(key: "bulletPoints" | "visualSymbols" | "negativePrompt", index: number, value: string) {
-    const next = [...card[key]];
+    const next = [...listValues[key]];
     next[index] = value;
     update(key, next);
   }
 
   function removeList(key: "bulletPoints" | "visualSymbols" | "negativePrompt", index: number) {
-    update(key, card[key].filter((_, itemIndex) => itemIndex !== index));
+    update(key, listValues[key].filter((_, itemIndex) => itemIndex !== index));
   }
 
   function addList(key: "bulletPoints" | "visualSymbols" | "negativePrompt") {
-    update(key, [...card[key], ""]);
+    update(key, [...listValues[key], ""]);
   }
 
   function toggleVisualSymbol(symbol: string) {
-    if (card.visualSymbols.includes(symbol)) {
-      update("visualSymbols", card.visualSymbols.filter((item) => item !== symbol));
+    if (visualSymbols.includes(symbol)) {
+      update("visualSymbols", visualSymbols.filter((item) => item !== symbol));
       return;
     }
-    update("visualSymbols", [...card.visualSymbols.filter(Boolean), symbol]);
+    update("visualSymbols", [...visualSymbols.filter(Boolean), symbol]);
   }
 
   return (
@@ -79,19 +84,19 @@ export function FeatureCardEditor({ card, loading = false, onChange, onRegenerat
         <span className="field-caption">呈現方式</span>
         <div className="pill-options">{presentationTypes.map((item) => <button type="button" key={item.value} className={card.presentationType === item.value ? "selected" : ""} onClick={() => update("presentationType", item.value)}>{item.label}</button>)}</div>
       </div>
-      <EditableList title="重點條列" items={card.bulletPoints} onChange={(i, value) => updateList("bulletPoints", i, value)} onRemove={(i) => removeList("bulletPoints", i)} onAdd={() => addList("bulletPoints")} />
+      <EditableList title="重點條列" items={bulletPoints} onChange={(i, value) => updateList("bulletPoints", i, value)} onRemove={(i) => removeList("bulletPoints", i)} onAdd={() => addList("bulletPoints")} />
       <div className="visual-symbol-editor">
         <div className="list-heading"><span>視覺符號</span><button type="button" onClick={() => addList("visualSymbols")}><Plus size={14} /> 自訂新增</button></div>
         <p>點選常用符號快速加入，再於下方自由修改文字。</p>
         <div className="symbol-presets">
           {visualSymbolPresets.map((symbol) => (
-            <button type="button" key={symbol} className={card.visualSymbols.includes(symbol) ? "selected" : ""} onClick={() => toggleVisualSymbol(symbol)}>
-              <span>{card.visualSymbols.includes(symbol) ? "✓" : "+"}</span>{symbol}
+            <button type="button" key={symbol} className={visualSymbols.includes(symbol) ? "selected" : ""} onClick={() => toggleVisualSymbol(symbol)}>
+              <span>{visualSymbols.includes(symbol) ? "✓" : "+"}</span>{symbol}
             </button>
           ))}
         </div>
         <div className="list-fields symbol-fields">
-          {card.visualSymbols.map((item, index) => (
+          {visualSymbols.map((item, index) => (
             <div key={`視覺符號-${index}`}>
               <span>{index + 1}</span>
               <input value={item} onChange={(e) => updateList("visualSymbols", index, e.target.value)} placeholder="輸入自訂視覺符號" />

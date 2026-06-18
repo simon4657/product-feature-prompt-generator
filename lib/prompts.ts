@@ -2,6 +2,7 @@ import type { PlanningDraft, ProductInput } from "@/types/prompt-generator";
 import {
   buildAdditionalNotesRequirement,
   buildCreativeDirection,
+  buildHumanPresenceRequirement,
   buildVisibleContentRequirement
 } from "@/lib/layout-presets";
 
@@ -25,7 +26,7 @@ export const REGENERATE_CARD_SYSTEM_PROMPT = `只重新生成指定功能圖企�
 
 export const FINAL_PROMPT_SYSTEM_PROMPT = `你是一位專業生圖 Prompt 工程師。請將已確認企劃轉換為可直接提供給生圖大模型的完整 Prompts。
 
-每張圖必須是獨立單張圖片，只呈現一個核心功能。禁止九宮格、拼貼、分割畫面。商品外觀必須依照使用者描述，有參考圖時需精準維持外觀、比例、材質與關鍵零件。文字需大而清楚，禁止亂碼、小字與重複文字。不得加入未確認的數據、認證、醫療效果或保證性用語。`;
+每張圖必須是獨立單張圖片，只呈現一個核心功能。禁止九宮格、拼貼、分割畫面。商品外觀必須依照使用者描述，有參考圖／墊圖時需精準維持外觀、比例、材質、輪廓與關鍵零件，不得重新設計、變形、拉伸、壓扁、扭曲、新增零件或移除零件。文字需大而清楚，禁止亂碼、小字與重複文字。不得加入未確認的數據、認證、醫療效果或保證性用語。`;
 
 export function buildPlanningUserPrompt(input: ProductInput) {
   return `請產生剛好 ${input.outputCount} 張功能圖企劃。cards 陣列長度必須等於 ${input.outputCount}，cardIndex 必須依序為 ${Array.from({ length: input.outputCount }, (_, index) => index + 1).join("、")}。
@@ -35,6 +36,7 @@ ${JSON.stringify(input, null, 2)}
 
 強制創意方向：
 ${buildCreativeDirection(input)}
+${buildHumanPresenceRequirement(input)}
 presentationType 只能決定如何解說功能，不得替換構圖版型、美術風格或使用場景。
 ${input.additionalNotes?.trim() ? `${buildAdditionalNotesRequirement(input)}\n補充說明必須轉化為 globalStyleRules.consistencyRules，並落實在每張 compositionDescription 或 sceneDescription 中。` : ""}
 
@@ -70,7 +72,7 @@ headline、subheadline、bulletPoints、featureMechanism 與 userBenefit 只能�
       "visualSymbols": ["視覺符號一", "視覺符號二"],
       "compositionDescription": "構圖描述",
       "sceneDescription": "場景描述",
-      "humanDescription": "人物描述，無人物時明確寫無人物",
+      "humanDescription": "人物描述，必須遵循使用者的人物設定",
       "negativePrompt": ["本張禁止事項"]
     }
   ],
@@ -90,6 +92,7 @@ export function buildPlanningRepairPrompt(input: ProductInput, invalidPlanning: 
 - cardIndex 必須依序為 ${Array.from({ length: input.outputCount }, (_, index) => index + 1).join("、")}
 - 每張只聚焦一個真實功能
 - 每張 bulletPoints 必須有 2 至 3 項非空白短句，visualSymbols 必須有 1 至 3 項可見符號
+- 每張 humanDescription 必須遵循：${buildHumanPresenceRequirement(input)}
 - 每張 compositionDescription 與 sceneDescription 必須共同執行以下創意方向：
 ${buildCreativeDirection(input)}
 ${input.additionalNotes?.trim() ? `- ${buildAdditionalNotesRequirement(input)}\n- 使用者補充說明必須保留在 globalStyleRules.consistencyRules，並落實到每張圖卡` : ""}

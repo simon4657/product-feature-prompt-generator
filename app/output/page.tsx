@@ -66,7 +66,7 @@ export default function OutputPage() {
           <aside className="panel output-guide">
             <span className="preview-label">USE GUIDE</span>
             <div className="guide-number">01</div><h3>貼入生圖模型</h3><p>完整複製 Image Prompt 與 Negative Prompt，避免只取其中一段。</p>
-            <div className="guide-number">02</div><h3>加入商品參考圖</h3><p>有參考圖時，請在模型中一併上傳，才能提高外觀一致性。</p>
+            <div className="guide-number">02</div><h3>加入商品參考圖／墊圖</h3><p>已開啟參考圖鎖定時，請在生圖模型中一併上傳原商品圖，並選擇保留外觀或墊圖模式，才能降低產品變形。</p>
             <div className="guide-number">03</div><h3>人工檢查文字</h3><p>生圖模型仍可能產生文字錯誤，商用前請檢查標題、結構與宣稱。</p>
           </aside>
         </div>

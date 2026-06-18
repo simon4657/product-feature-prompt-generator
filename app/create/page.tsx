@@ -49,6 +49,7 @@ const visualStyles = [
 ];
 
 const humanOptions: { value: HumanPresence; label: string }[] = [
+  { value: "auto", label: "AI 依情境決定" },
   { value: "none", label: "無人物" },
   { value: "model", label: "有人物" },
   { value: "hand", label: "手部特寫" },
@@ -92,6 +93,14 @@ const sceneTypeOptions = [
 const MEMORY_STORAGE_KEY = "product-prompt-generator-memory-slots";
 type MemorySlot = ProductInput | null;
 type GeneratingField = "appearance" | "features" | "layout" | "scene" | "forbidden" | "notes";
+const fieldTargets: Record<GeneratingField, keyof ProductInput> = {
+  appearance: "appearanceDescription",
+  features: "realFeatures",
+  layout: "layoutStyle",
+  scene: "sceneType",
+  forbidden: "forbiddenClaims",
+  notes: "additionalNotes"
+};
 
 function normalizeProductInput(saved: ProductInput & { presentationPreference?: unknown }): ProductInput {
   const { presentationPreference: _legacyPresentationPreference, ...input } = saved;
@@ -178,23 +187,16 @@ export default function CreatePage() {
     setError("");
     setGeneratingField(field);
     try {
+      const inputForGeneration = { ...currentForm, [fieldTargets[field]]: "" };
       const response = await fetch("/api/generate-field", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiSettings, productInput: currentForm, field })
+        body: JSON.stringify({ apiSettings, productInput: inputForGeneration, field })
       });
       const data = await readApiResponse<{ success: boolean; message?: string; content: string }>(response);
       if (!response.ok || !data.success) throw new Error(data.message || "AI 生成失敗。");
-      const targets: Record<GeneratingField, keyof ProductInput> = {
-        appearance: "appearanceDescription",
-        features: "realFeatures",
-        layout: "layoutStyle",
-        scene: "sceneType",
-        forbidden: "forbiddenClaims",
-        notes: "additionalNotes"
-      };
       setForm((current) => {
-        const next = { ...current, [targets[field]]: data.content };
+        const next = { ...current, [fieldTargets[field]]: data.content };
         formRef.current = next;
         return next;
       });
@@ -258,7 +260,7 @@ export default function CreatePage() {
               <input type="checkbox" checked={form.hasReferenceImage} onChange={(e) => update("hasReferenceImage", e.target.checked)} />
               <ImagePlus size={22} /><span><b>我有商品參考圖</b><small>最終 Prompt 會加入嚴格維持參考圖外觀的要求</small></span><i>{form.hasReferenceImage && <Check size={14} />}</i>
             </label>
-            <div className="field">
+            <div className="field" hidden style={{ display: "none" }}>
               <div className="field-title-row"><label htmlFor="appearance-description">商品外觀描述 <small>選填</small></label><button type="button" className="ai-field-button" onClick={() => generateField("appearance")} disabled={generatingField !== null}>{generatingField === "appearance" ? <LoaderCircle className="spin" size={13} /> : <Sparkles size={13} />} AI 生成</button></div>
               <textarea id="appearance-description" value={form.appearanceDescription || ""} onChange={(e) => update("appearanceDescription", e.target.value)} placeholder="選填：顏色、材質、輪廓、比例、關鍵零件與不可改變的外觀特徵" />
             </div>

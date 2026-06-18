@@ -1,5 +1,5 @@
 export type OutputCount = 1 | 2 | 3;
-export type HumanPresence = "none" | "model" | "hand" | "foot" | "wearing_demo";
+export type HumanPresence = "auto" | "none" | "model" | "hand" | "foot" | "wearing_demo";
 export type PresentationType = "decomposition" | "comparison" | "scenario" | "infographic";
 export type AspectRatio = "1:1" | "4:5" | "9:16" | "16:9";
 export type AspectRatioPreference = AspectRatio | "ai_suggest";
